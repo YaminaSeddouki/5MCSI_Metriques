@@ -1,33 +1,63 @@
-<html>
+<!DOCTYPE html>
+<html lang="fr">
   <head>
+    <meta charset="UTF-8" />
+    <title>Métriques – Tawarano</title>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
-    <script type="text/javascript">
-      google.charts.load("current", {packages:["corechart"]});
-      google.charts.setOnLoadCallback(drawChart);
-      function drawChart() {
-        var dataTable = new google.visualization.DataTable();
-    dataTable.addColumn('string', 'Date');
-    dataTable.addColumn('number', 'Valeur');
-    data.results.forEach(entry => {
-      var date = new Date(entry.Jour * 1000);
-      dataTable.addRow([date.toLocaleDateString(), entry.temp]);
-    });
+    <style>
+      #chart_div { width: 100%; height: 480px; }
+    </style>
+  </head>
+  <body>
+    <div id="chart_div"></div>
 
-        var options = {
-      title: 'Évolution des températures de la ville de Tawarano',
-      curveType: 'function',
-      legend: { position: 'bottom' }
-    };
-    var chart = new google.visualization.LineChart(document.getElementById('chart_div'));
-    chart.draw(dataTable, options);
-  }
-  // Récupération de données depuis notre API /tawarano/
-  fetch('/tawarano/')
-    .then(response => response.json())
-    .then(data => {
-      drawChart(data);
-    })
-}
+    <script>
+      // On charge le paquet "corechart" qui contient ColumnChart
+      google.charts.load('current', { packages: ['corechart'] });
+      google.charts.setOnLoadCallback(init);
+
+      function init() {
+        fetch('/tawarano/')
+          .then((res) => res.json())
+          .then((data) => drawColumnChart(data))
+          .catch((err) => {
+            console.error('Erreur de chargement des données /tawarano/:', err);
+            document.getElementById('chart_div').innerText =
+              'Impossible de charger les données.';
+          });
+      }
+
+      function drawColumnChart(data) {
+        // On sécurise la structure attendue: data.results = [{ Jour: <epoch_s>, temp: <number> }, ...]
+        const rows = (data && Array.isArray(data.results) ? data.results : []).map((entry) => {
+          const d = new Date(entry.Jour * 1000);
+          // Affichage jour/mois/année en FR
+          const label = d.toLocaleDateString('fr-FR');
+          const value = Number(entry.temp);
+          return [label, isNaN(value) ? null : value];
+        });
+
+        // Construction du DataTable
+        const dataTable = new google.visualization.DataTable();
+        dataTable.addColumn('string', 'Date');
+        dataTable.addColumn('number', 'Température (°C)');
+        dataTable.addRows(rows);
+
+        // Options pour un histogramme (diagramme en colonnes)
+        const options = {
+          title: 'Températures quotidiennes – Tawarano',
+          legend: { position: 'none' },
+          hAxis: { title: 'Date', slantedText: true, slantedTextAngle: 45 },
+          vAxis: { title: 'Température (°C)' },
+          bar: { groupWidth: '80%' }
+        };
+
+        const chart = new google.visualization.ColumnChart(document.getElementById('chart_div'));
+        chart.draw(dataTable, options);
+
+        // Redessine au redimensionnement de la fenêtre
+        window.addEventListener('resize', () => chart.draw(dataTable, options));
+      }
     </script>
   </body>
 </html>
